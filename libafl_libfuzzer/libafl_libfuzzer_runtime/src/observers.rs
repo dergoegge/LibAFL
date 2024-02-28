@@ -364,3 +364,55 @@ where
         Ok(())
     }
 }
+
+// User definable feature domains
+static mut LIBAFL_LIBFUZZER_USER_FEATURES: [u64; 16] = [0u64; 16];
+
+#[no_mangle]
+pub extern "C" fn libafl_libfuzzer_observe_feature(feature_index: u8, feature: u64) {
+    unsafe {
+        if feature_index as usize >= LIBAFL_LIBFUZZER_USER_FEATURES.len() {
+            return;
+        }
+
+        LIBAFL_LIBFUZZER_USER_FEATURES[feature_index as usize] = feature;
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct UserFeatureObserver {
+    pub user_features: [u64; 16],
+}
+
+impl UserFeatureObserver {
+    pub fn new() -> Self {
+        Self {
+            user_features: [0u64; 16],
+        }
+    }
+}
+
+impl Named for UserFeatureObserver {
+    fn name(&self) -> &str {
+        "user-feature-observer"
+    }
+}
+
+impl<S> Observer<S> for UserFeatureObserver
+where
+    S: UsesInput,
+    S::Input: HasLen,
+{
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        unsafe {
+            self.user_features
+                .clone_from_slice(LIBAFL_LIBFUZZER_USER_FEATURES.as_slice());
+        }
+        Ok(())
+    }
+}

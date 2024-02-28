@@ -122,6 +122,8 @@ pub struct LibfuzzerOptions {
     tui: bool,
     runs: usize,
     close_fd_mask: u8,
+    ignore_user_features: bool,
+    only_use_user_features: bool,
     unknown: Vec<String>,
 }
 
@@ -223,6 +225,14 @@ impl LibfuzzerOptions {
         self.close_fd_mask
     }
 
+    pub fn ignore_user_features(&self) -> bool {
+        self.ignore_user_features
+    }
+
+    pub fn only_use_user_features(&self) -> bool {
+        self.only_use_user_features
+    }
+
     pub fn unknown(&self) -> &[String] {
         &self.unknown
     }
@@ -251,6 +261,8 @@ struct LibfuzzerOptionsBuilder<'a> {
     tui: bool,
     runs: usize,
     close_fd_mask: u8,
+    ignore_user_features: Option<bool>,
+    only_use_user_features: Option<bool>,
     unknown: Vec<&'a str>,
 }
 
@@ -320,6 +332,13 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "ignore_ooms" => {
                             self.ignore_ooms = Some(parse_or_bail!(name, value, u64) > 0);
+                        }
+                        "ignore_user_features" => {
+                            self.ignore_user_features = Some(parse_or_bail!(name, value, u64) > 0);
+                        }
+                        "only_use_user_features" => {
+                            self.only_use_user_features =
+                                Some(parse_or_bail!(name, value, u64) > 0);
                         }
                         "rss_limit_mb" => {
                             self.rss_limit = Some(parse_or_bail!(name, value, usize) << 20);
@@ -394,6 +413,8 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             tui: self.tui,
             runs: self.runs,
             close_fd_mask: self.close_fd_mask,
+            ignore_user_features: self.ignore_user_features.unwrap_or_default(),
+            only_use_user_features: self.only_use_user_features.unwrap_or_default(),
             unknown: self
                 .unknown
                 .into_iter()

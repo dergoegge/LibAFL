@@ -185,9 +185,9 @@ macro_rules! fuzz_with {
         use crate::{
             CustomMutationStatus,
             corpus::{ArtifactCorpus, LibfuzzerCorpus},
-            feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback},
+            feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback, UserFeatureFeedback},
             misc::should_use_grimoire,
-            observers::{MappedEdgeMapObserver, SizeValueObserver},
+            observers::{MappedEdgeMapObserver, SizeValueObserver, UserFeatureObserver},
         };
 
         let edge_maker = &$edge_maker;
@@ -228,6 +228,8 @@ macro_rules! fuzz_with {
 
             let calibration = CalibrationStage::new(&map_feedback);
 
+            let user_feature_observer = UserFeatureObserver::new();
+
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_and_fast!(
@@ -240,10 +242,15 @@ macro_rules! fuzz_with {
                 ),
                 keep_observer,
                 feedback_or!(
-                    map_feedback,
-                    feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
-                    // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    feedback_and_fast!(ConstFeedback::new(!$options.only_use_user_features()),
+                        feedback_or!(
+                            map_feedback,
+                            feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
+                            // Time feedback, this one does not need a feedback state
+                            TimeFeedback::with_observer(&time_observer)
+                        )
+                    ),
+                    feedback_and_fast!(ConstFeedback::new(!$options.ignore_user_features()), UserFeatureFeedback::new())
                 )
             );
 
@@ -436,7 +443,7 @@ macro_rules! fuzz_with {
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = InProcessExecutor::with_timeout(
                     &mut harness,
-                    tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
+                    tuple_list!(edges_observer, size_edges_observer, time_observer, user_feature_observer, backtrace_observer, oom_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
